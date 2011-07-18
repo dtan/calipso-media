@@ -3,13 +3,10 @@
  */
 var calipso = require("lib/calipso");
 
-exports = module.exports = {init: init, route: route,
-   about: {
-    description: 'Media management (upload, insert, edit, delete, gallery) type functions for linking and using with content (in progress).',
-    author: 'cliftonc',
-    version: '0.1.1',
-    home:'http://github.com/cliftonc/calipso'
-  }};
+exports = module.exports = {
+  init: init, 
+  route: route
+};
 
 /**
  * Router
