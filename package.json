@@ -8,5 +8,10 @@
     "type": "git",
     "url": "git://github.com/cliftonc/calipso-media.git"
   },
+  "dependencies": {
+    "mkdirp": "0.0.7",
+    "async": "0.1.x",
+    "imagemagick": "0.1.x"
+  },
   "author": "Clifton Cunningham <clifton.cunningham@gmail.com> (cliftoncunningham.co.uk)"
 }
