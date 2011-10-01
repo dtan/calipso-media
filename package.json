@@ -1,5 +1,6 @@
 {
   "name": "media",
+  "label": "Media Management",
   "description": "Media management (upload, insert, edit, delete, gallery) type functions for linking and using with content (in progress).",
   "version": "0.2.0",
   "homepage": "http://calip.so",
