@@ -458,11 +458,12 @@ function galleryUpsert(req,res,template,block,next) {
 
       if(g) {
         
-        if(req.formData.mediaGallery._id) {
+        if(req.formData.mediaGallery.url) {
             
           // If we have been provided with an _id we are updating
 
-          calipso.form.mapFields(req.formData.mediaGallery, g);
+          calipso.form.mapFields(req.formData.mediaGallery, g);          
+
           g.save(function(err) {   
           
             if(req.formData.type === 'json') {
@@ -634,16 +635,12 @@ function doDeleteMedia(media, next) {
     }
   } catch(ex) {
     if(ex.code === "ENOENT") {
-      return next();
+      // Ignore - it isn't there anymore
     } else {
       return next(ex);      
-    }
-    
+    }    
   }
-
-  // We can't delete the directory because we are not sure if it is empty
-  // TODO : recursively delete folders that are empty
-
+  
   // Delete the media in mongoose
   Media.remove({_id:media._id}, next);
 
@@ -704,8 +701,7 @@ function mediaUpload(req, res, template, block, next) {
         console.dir(err);        
         next(err);
       }
-        
-      
+              
       gallerySortAfterUpload(gallery.url, results, function(err) {
         res.redirect(returnTo);
         next(err);
@@ -729,7 +725,7 @@ function processFile(file, next) {
 
     // Now, create the mongoose object for it
     var m = new Media();
-    m.name = file.file.name;
+    m.name = path.basename(file.file.name, path.extname(file.file.name));
     m.mediaType = file.file.type;
     m.path = file.to.replace(path.join(rootpath,"media"),"");
     m.author = file.author;

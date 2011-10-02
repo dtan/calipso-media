@@ -1,15 +1,20 @@
 <div class="gallery-image-header">
 	<h2><%= media.name %></h2>
 	<ul class="gallery-image-actions">
-		<li>
-			<a href="<%= media.prevId %>" class="gallery-image-prev"><%= t('Previous') %></a>
-		</li>
-		<li>
-			<a href="/gallery/show/<%= media.gallery %>" class="gallery-image-all"><%= t('Show All') %></a>
-		</li>
+		<% if(media.nextId) { %>
 		<li>
 			<a href="<%= media.nextId %>" class="gallery-image-next"><%= t('Next') %></a>
 		</li>		
+		<% } %>
+		<li>
+			<a href="/gallery/show/<%= media.gallery %>" class="gallery-image-all"><%= t('Show All') %></a>
+		</li>
+		<% if(media.prevId) { %>
+		<li>
+			<a href="<%= media.prevId %>" class="gallery-image-prev"><%= t('Previous') %></a>
+		</li>
+		<% } %>
+
 	</ul>
 </div>
 <br class="clear">
