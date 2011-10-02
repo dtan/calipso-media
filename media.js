@@ -64,6 +64,8 @@ function init(module,app,next) {
           ispublic:{type: Boolean, required: true, "default": false},
           gallery:{type: String},
           thumb:{type: String},
+          prevId:{type: String},
+          nextId:{type: String},
           sort:{type: Number,"default":0},          
           tags:[String],
           description:String,          
@@ -187,7 +189,7 @@ function mediaEditForm(req,res,template,block,next) {
 
 function mediaUpdate(req,res,template,block,next) {
 
-  // To do 
+  // Check to see if we are updating one, or the sort
   var mediaId = req.formData.media._id;
   var returnTo = req.formData.returnTo || "/media";
   var Media = calipso.lib.mongoose.model('Media');  
@@ -197,13 +199,18 @@ function mediaUpdate(req,res,template,block,next) {
     calipso.form.mapFields(req.formData.media,media);
 
     media.save(function(err) {
-      if(err) {  
-        req.flash('info',req.t('Unable to update the image because {msg}',{msg:err.message}));        
-      } else {        
-        req.flash('info',req.t('The image has now been updated.'));        
+      
+      if(req.formData.type === 'json') {
+        res.end(err ? "ERROR" : "OK");
+      } else {
+        if(err) {  
+          req.flash('info',req.t('Unable to update the image because {msg}',{msg:err.message}));        
+        } else {        
+          req.flash('info',req.t('The image has now been updated.'));        
+        }
+        res.redirect(returnTo);
+        next();              
       }
-      res.redirect(returnTo);
-      next();              
     })      
     
   })
@@ -216,17 +223,40 @@ function mediaDelete(req,res,template,block,next) {
   var returnTo = req.moduleParams.returnTo || "/media";
   var Media = calipso.lib.mongoose.model('Media');
 
-  Media.findOne({_id:mediaId}, function(err,media) {
-    doDeleteMedia(media,function(err,result) {
-      if(err) {
-        req.flash('info',req.t('Unable to delete the image because {msg}',{msg:err.message}));        
-      } else {        
-        req.flash('info',req.t('The image has now been deleted.'));        
-      }
-      res.redirect(returnTo);
-      next();              
-    });  
-  })
+  if(mediaId === 'all') {
+
+    var gallery = req.moduleParams.gallery, async = require('async');
+
+    Media.find({gallery:gallery}, function(err,items) {
+      
+      async.map(items,doDeleteMedia,function(err,result) {      
+        if(err) {
+          req.flash('info',req.t('Unable to delete all images because {msg}',{msg:err.message}));        
+        } else {        
+          req.flash('info',req.t('The images have now been deleted.'));        
+        }
+        res.redirect(returnTo);
+        next();                
+
+      });
+      
+    })    
+    
+  } else {
+
+    Media.findOne({_id:mediaId}, function(err,media) {
+      doDeleteMedia(media,function(err,result) {
+        if(err) {
+          req.flash('info',req.t('Unable to delete the image because {msg}',{msg:err.message}));        
+        } else {        
+          req.flash('info',req.t('The image has now been deleted.'));        
+        }
+        res.redirect(returnTo);
+        next();              
+      });  
+    })
+
+  }
   
 }
  
@@ -248,7 +278,8 @@ function galleryShow(req,res,template,block,next) {
 
   res.menu.adminToolbar.addMenuItem({name:'List',weight:1,path:'list',url:'/gallery',description:'Return to list ...',security:[]});
   res.menu.adminToolbar.addMenuItem({name:'Edit',weight:2,path:'edit',url:'/gallery/edit/' + galleryUrl,description:'Edit Gallery ...',security:[]});
-  res.menu.adminToolbar.addMenuItem({name:'Delete',weight:3,path:'delete',url:'/gallery/delete/' + galleryUrl,description:'Delete Gallery ...',security:[]});
+  res.menu.adminToolbar.addMenuItem({name:'Delete Gallery',weight:4,path:'delete',url:'/gallery/delete/' + galleryUrl,description:'Delete Gallery ...',security:[]});
+  res.menu.adminToolbar.addMenuItem({name:'Delete All',weight:3,path:'deleteall',url:'/media/delete/all?gallery=' + galleryUrl + '&returnTo=/gallery/show/' + galleryUrl, description:'Delete Image ...',security:[]});
 
   // Add hidden tag to allow attachment to a gallery  
   uploadForm.fields.push({label:'',type:'hidden',name:'mediaGallery[url]'})
@@ -258,17 +289,31 @@ function galleryShow(req,res,template,block,next) {
     }
   };
 
+  // Check public
+  var isAdmin = req.session && req.session.user && req.session.user.isAdmin;  
+  var query = {url:galleryUrl};
+  if(!isAdmin) {
+    query.ispublic = true;
+  }
+
   // Get the gallery
-  Gallery.findOne({url:galleryUrl}, function(err, gallery) {
+  Gallery.findOne(query, function(err, gallery) {
 
-    // Get our content
-    Media.find({gallery:galleryUrl}, function(err, media) {
+    if(!err && gallery) {
 
-      calipso.form.render(uploadForm,values,req,function(form) {
-        calipso.theme.renderItem(req,res,template,block,{gallery:gallery, media:media, form:form},next);
+      // Get our content
+      Media.find({gallery:galleryUrl}).sort('sort',1).find(function(err, media) {
+
+        calipso.form.render(uploadForm,values,req,function(form) {
+          calipso.theme.renderItem(req,res,template,block,{gallery:gallery, media:media, form:form},next);
+        });
+    
       });
-  
-    });
+    } else {
+      req.flash('error',req.t('You are not able to view media in that gallery ...'));
+      res.redirect("/gallery");
+      next();
+    }
 
   });
   
@@ -281,17 +326,40 @@ function galleryShow(req,res,template,block,next) {
 function galleryMediaShow(req,res,template,block,next) {
 
   var Media = calipso.lib.mongoose.model('Media');
+  var Gallery = calipso.lib.mongoose.model('MediaGallery');
 
   var mediaId = req.moduleParams.id;
-  var gallery = req.moduleParams.gallery;
+  var galleryUrl = req.moduleParams.gallery;
 
-  res.menu.adminToolbar.addMenuItem({name:'Gallery',weight:2,path:'gallery',url:'/gallery/show/' + gallery,description:'Back to Gallery ...',security:[]});
-  res.menu.adminToolbar.addMenuItem({name:'Edit',weight:2,path:'edit',url:'/media/edit/' + mediaId + '?returnTo=/gallery/show/' + gallery + '/image/' + mediaId,description:'Edit Image ...',security:[]});
-  res.menu.adminToolbar.addMenuItem({name:'Delete',weight:3,path:'delete',url:'/media/delete/' + mediaId + '?returnTo=/gallery/show/' + gallery, description:'Delete Image ...',security:[]});
+  res.menu.adminToolbar.addMenuItem({name:'Gallery',weight:2,path:'gallery',url:'/gallery/show/' + galleryUrl,description:'Back to Gallery ...',security:[]});
+  res.menu.adminToolbar.addMenuItem({name:'Edit',weight:2,path:'edit',url:'/media/edit/' + mediaId + '?returnTo=/gallery/show/' + galleryUrl + '/image/' + mediaId,description:'Edit Image ...',security:[]});
+  res.menu.adminToolbar.addMenuItem({name:'Delete',weight:3,path:'delete',url:'/media/delete/' + mediaId + '?returnTo=/gallery/show/' + galleryUrl, description:'Delete Image ...',security:[]});
 
-  Media.findOne({_id:mediaId}, function(err,media) {    
-    calipso.theme.renderItem(req,res,template,block,{gallery:gallery, media:media},next);    
-  })
+  // Check public
+  var isAdmin = req.session && req.session.user && req.session.user.isAdmin;  
+  var query = {url:galleryUrl};
+  if(!isAdmin) {
+    query.ispublic = true;
+  }
+
+  // Get the gallery
+  Gallery.findOne(query, function(err, gallery) {
+    
+    // Check to see if we can see it
+    if(!err && gallery) {        
+        
+        // Get our media
+        Media.findOne({_id:mediaId}, function(err,media) {
+          calipso.theme.renderItem(req,res,template,block,{gallery:galleryUrl, media:media},next);    
+        });
+
+    } else {
+      req.flash('error',req.t('You are not able to view media in that gallery ...'));
+      res.redirect("/gallery");
+      next();
+    }
+
+  });
   
 }
 
@@ -304,8 +372,15 @@ function galleryList(req,res,template,block,next) {
 
   res.menu.adminToolbar.addMenuItem({name:'Create',weight:1,path:'create',url:'/gallery/create',description:'Create New ...',security:[]});
 
+  // Check public
+  var isAdmin = req.session && req.session.user && req.session.user.isAdmin;  
+  var query = {};
+  if(!isAdmin) {
+    query.ispublic = true;
+  }
+
   // Get the galleries
-  Gallery.find({}, function(err, galleries) {
+  Gallery.find(query, function(err, galleries) {
 
     // Render the item via the template provided above
     calipso.theme.renderItem(req,res,template,block,{galleries:galleries},next);
@@ -372,56 +447,136 @@ function galleryUpsert(req,res,template,block,next) {
   
   var Gallery = calipso.lib.mongoose.model('MediaGallery');
 
-  if(!req.formData.mediaGallery) {
-    return next(new Error("There was an error with the form submission, please try again ..."));
-  } 
-
-  var galleryUrl = req.formData.mediaGallery.url;
-
-  // First, lets try and find our gallery
-  Gallery.findOne({url:galleryUrl}, function(err, g) {
-
-    if(err) return next(err);
-
-    if(g) {
+  if(req.formData.mediaGallery) {
       
-      // Update
-      calipso.form.mapFields(req.formData.mediaGallery, g);
-      g.save(function(err) {        
-        if(err) {
-          req.flash('error',err.message);          
+    var galleryUrl = req.formData.mediaGallery.url;
+
+    // First, lets try and find our gallery
+    Gallery.findOne({url:galleryUrl}, function(err, g) {
+
+      if(err) return next(err);
+
+      if(g) {
+        
+        if(req.formData.mediaGallery._id) {
+            
+          // If we have been provided with an _id we are updating
+
+          calipso.form.mapFields(req.formData.mediaGallery, g);
+          g.save(function(err) {   
+          
+            if(req.formData.type === 'json') {
+              // Updates allowed via json
+              res.end(err ? "ERROR" : "OK");
+            } else {     
+              if(err) {
+                req.flash('error',err.message);          
+              } else {
+                req.flash('info',req.t('Gallery saved ...'));                   
+              }
+              res.redirect("/gallery/show/" + galleryUrl); 
+              return next(err);  
+            }
+          });
+
         } else {
-          req.flash('info',req.t('Gallery saved ...'));                   
+          
+          // Assume we are trying to sort it - THIS CANNOT work on paged results      
+          // For some reason it comes back from jquery as {'':order};
+          var orderedArray = req.formData.mediaGallery.sortOrder[''];          
+          gallerySortFromArray(orderedArray, function(err,result) {
+            res.end(err ? "ERROR" : "OK");            
+          });
         }
-        res.redirect("/gallery/show/" + galleryUrl); 
-        return next(err);  
-      });
 
-    } else {
-      
-      // Create
-      var g = new Gallery(req.formData.mediaGallery);
+      } else {
+        
+        // Create
+        var g = new Gallery(req.formData.mediaGallery);
 
-      // Additional fields
-      g.author = req.session.user.username;
+        // Additional fields
+        g.author = req.session.user.username;
 
-      g.save(function(err) {        
-        if(err) {
-          req.flash('error',err.message);
-          res.redirect("/gallery");
-        } else {
-          req.flash('info',req.t('Gallery created successfully ...'));
-          res.redirect("/gallery/show/" + galleryUrl);          
-        }
-        return next(err);  
-      })
+        g.save(function(err) {        
+          if(err) {
+            req.flash('error',err.message);
+            res.redirect("/gallery");
+          } else {
+            req.flash('info',req.t('Gallery created successfully ...'));
+            res.redirect("/gallery/show/" + galleryUrl);          
+          }
+          return next(err);  
+        })
 
-      
-    }
+        
+      }
 
-  });
+    });
+
+   } else {
+   
+      return next(new Error("Unable to locate the specified gallery to update."));
+     
+   }
+
 
 }
+
+function gallerySortAfterUpload(galleryUrl, newMedia, next) {
+  
+    // Initialise the sort order of the items
+    // results is the images just added, but we need to add the images we already have first
+    var Media = calipso.lib.mongoose.model('Media');      
+    Media.find({gallery:galleryUrl}).where('sort').gt(0).sort('sort',1).find(function(err, media) {               
+
+      if(err) return next(err);
+
+      var orderedArray = [];
+      media.forEach(function(item) {
+          orderedArray.push(item._id);
+      })
+      newMedia.forEach(function(item) {
+          orderedArray.push(item);
+      })
+
+      gallerySortFromArray(orderedArray, next);
+
+    });
+
+}
+
+/**
+ * Sort a gallery based on a provided list of ordered mediaIds
+ */
+ function gallerySortFromArray(orderedArray, next) {
+   
+  var async = require('async'), counter = 0;
+  var Media = calipso.lib.mongoose.model('Media');
+
+   // Sort based on the order provided, can either be text (a property) or an array of ids
+  var mediaOrder = function(mediaId, next) {
+
+   // Find the current media in the array to lets us save prev / next
+   var currentIndex = calipso.lib._.indexOf(orderedArray, mediaId), 
+       prevId = (currentIndex > 0 ? orderedArray[currentIndex - 1] : ''),
+       nextId = (currentIndex !== orderedArray.length - 1 ? orderedArray[currentIndex + 1] : '');
+   
+   // Get the media, so we can add a select
+    Media.findById(mediaId, function(err, media) {
+      counter ++;
+      media.sort = counter;
+      media.nextId = nextId;
+      media.prevId = prevId;
+      media.save(function(err) {
+        next(err);  
+      });              
+    });     
+         
+  }
+
+  async.map(orderedArray, mediaOrder, next);
+
+ }
 
 /**
  * List of galleries - either all or just for a user
@@ -542,14 +697,16 @@ function mediaUpload(req, res, template, block, next) {
       });      
     }
 
-    // Process everything in the queue
-    async.map(fileQueue,processFile,function(err, result) {            
+    // Process everything in the queue - do it in series for now
+    async.mapSeries(fileQueue,processFile,function(err, results) {            
       
       if(err)
-        console.dir(err);      
-
-      res.redirect(returnTo);
-      next(err);
+        return next(err);
+      
+      gallerySortAfterUpload(gallery.url, results, function(err) {
+        res.redirect(returnTo);
+        next(err);
+      });
 
     });
 
@@ -557,7 +714,7 @@ function mediaUpload(req, res, template, block, next) {
 
 function processFile(file, next) {
 
-  var tbHeight = '160';
+  var tbHeight = '100';
 
   var im = require('imagemagick');
   
@@ -573,35 +730,46 @@ function processFile(file, next) {
     m.mediaType = file.file.type;
     m.path = file.to.replace(path.join(rootpath,"media"),"");
     m.author = file.author;
+    m.sort = -1;
     if(file.gallery) {
       m.gallery = file.gallery.url;
     }
 
-    im.identify(file.to, function(err, metadata){
+    im.identify(file.to, function(err, ident_metadata){
 
       // If imagemagick fails (not installed) ignore silently
       if (!err) {    
         
-        // Store the metadata for later use
-        m.set('metadata',metadata);
-
         var thumb = path.join(
             path.dirname(file.to),
             path.basename(file.to, path.extname(file.to)) + "-thumb" + path.extname(file.to));
         
         m.thumb = thumb.replace(path.join(rootpath,"media"),"");;
 
-        // Resize the image to create a thumb
-        // mogrify -resize 80x80 -background white -gravity center -extent 80x80 -format jpg -quality 75 -path thumbs *.jpg
+        im.readMetadata(file.to, function(err, exif_metadata) {
 
-        var isPortrait = (metadata.width < metadata.height);
-        var thumbSize = isPortrait ? tbHeight + 'x^' : 'x' + tbHeight + '^';
+          var metadata = calipso.lib._.extend(ident_metadata, exif_metadata);
 
-        im.convert([file.to, '-resize', thumbSize,'-filter','lagrange','-sharpen','0.5','-quality','90', thumb], function(err, stdout, stderr) {
-          if (err) throw err                
-          m.save(function(err) {
-            next(err);  
-          })    
+          // Set our metadata
+          m.set('metadata',metadata);          
+
+          fixRotation(m, function(err, m) {
+
+            // Resize the image to create a thumb
+            // mogrify -resize 80x80 -background white -gravity center -extent 80x80 -format jpg -quality 75 -path thumbs *.jpg
+
+            var isPortrait = (metadata.width < metadata.height);
+            var thumbSize = 'x120';
+
+            im.convert([file.to, '-resize', thumbSize,'-filter','lagrange','-sharpen','0.2','-quality','80', thumb], function(err, stdout, stderr) {
+              if (err) throw err                
+              m.save(function(err) {
+                next(err, m._id);  
+              })    
+            });
+
+          });
+
         });
         
       } else {
@@ -615,6 +783,37 @@ function processFile(file, next) {
     });
     
   });  
+
+}
+
+/**
+ * Check to see if the image should be rotated
+ */ 
+function fixRotation(media, next) {
+    
+    var metadata = media.get('metadata');
+    var im = require('imagemagick');
+
+    // Check to see if it is rotated
+    // See http://sylvana.net/jpegcrop/exif_orientation.html
+
+    var rotate_image, img = path.join(rootpath,"media",media.path);
+
+    if(metadata && metadata.exif && metadata.exif.orientation === 6) {
+      rotate_image = [img,'-rotate','90',img]
+    } else if(metadata && metadata.exif && metadata.exif.orientation === 7) {
+      rotate_image = [img,'-rotate','-90',img]
+    }
+      
+    if(rotate_image) {
+      metadata.rotated = true;
+      media.set('metadata',metadata);
+      im.convert(rotate_image, function(err, stdout, stderr) {
+        next(err, media);
+      });
+    } else {
+      next(null,media);  
+    }
 
 }
 
