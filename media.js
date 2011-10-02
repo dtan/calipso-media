@@ -1,5 +1,9 @@
 /**
  * Media management module
+ * 
+ * This module provides both generic upload / mgmt functionality (e.g. to allow upload of content into pages)
+ * as well as gallery features.
+ * 
  */
 var rootpath = process.cwd() + '/',
   path = require('path'),
@@ -57,7 +61,8 @@ function init(module,app,next) {
 
         // Schema
         var Media = new calipso.lib.mongoose.Schema({
-          name:{type: String, required: true},
+          name:{type: String, "default":""},
+          fileName:{type: String},
           mediaType:{type: String, required: true},
           path:{type: String, required: true},
           author:{type: String, required: true},
@@ -725,7 +730,8 @@ function processFile(file, next) {
 
     // Now, create the mongoose object for it
     var m = new Media();
-    m.name = path.basename(file.file.name, path.extname(file.file.name));
+    m.name = ''; // path.basename(file.file.name, path.extname(file.file.name)); TODO make configurable
+    m.fileName = file.file.name;
     m.mediaType = file.file.type;
     m.path = file.to.replace(path.join(rootpath,"media"),"");
     m.author = file.author;

@@ -10,7 +10,7 @@ $(function(){
     });
 
     // sortable
-    $( ".sortable" ).sortable({ 	    
+    $( ".sortable" ).sortable({ 	    	
 	    opacity: 0.6,
 	    placeholder: 'gallery-image-highlight',
 	    appendTo: '.gallery-images',
@@ -47,6 +47,7 @@ $(function(){
 });
 
 </script>
+
 <div class="gallery">
 	<h2 class="gallery-title"><%= gallery.name %></h2>
 	<div class="gallery-description"><%- gallery.description %></div>
@@ -57,7 +58,7 @@ $(function(){
 			<li id="<%= item._id %>">				
 				<a href="/gallery/show/<%= gallery.url %>/image/<%= item._id %>" title="<%= item.name %>">
 					<img src="<%- item.thumb ? item.thumb : item.path %>" class="gallery-list-image" alt="<%= item.name %>" />
-				</a>			
+				</a>																
 				<div class='<%= user.isAdmin ? "editable" : "" %>' title='<%= user.isAdmin ? "Click to edit ..." : "" %>' id='<%= item._id %>'><%= item.name %></div>				
 			</li>
 		<%		
@@ -65,9 +66,11 @@ $(function(){
 	%>
 	</ul>
 	<br class="clear">
-	<script src="/js/jquery.inlineedit.js"></script>
-	<script src="/js/jquery.ui.touch-punch.min.js"></script>	
-	<script src="/js/jquery-ui-1.8.16.custom.min.js"></script>
+
+	<script type="text/javascript" src="/js/jquery.inlineedit.js"></script>
+	<script type="text/javascript" src="/js/jquery.ui.touch-punch.min.js"></script>	
+	<script type="text/javascript" src="/js/jquery-ui-1.8.16.custom.min.js"></script>
+	
 	<% if(user.isAdmin) { %>  
 	  <%- form %>
 	<% } %>
