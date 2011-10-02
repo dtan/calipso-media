@@ -700,8 +700,11 @@ function mediaUpload(req, res, template, block, next) {
     // Process everything in the queue - do it in series for now
     async.mapSeries(fileQueue,processFile,function(err, results) {            
       
-      if(err)
-        return next(err);
+      if(err) {
+        console.dir(err);        
+        next(err);
+      }
+        
       
       gallerySortAfterUpload(gallery.url, results, function(err) {
         res.redirect(returnTo);
@@ -774,6 +777,8 @@ function processFile(file, next) {
         
       } else {
         
+        calipso.silly("ImageMagick failed, no thumbnail or rotation available ...");
+
         m.save(function(err) {
           next(err);  
         });
@@ -841,6 +846,8 @@ function mv(from, to, next) {
       mkdirp = require('mkdirp'),
       util = require('util');
 
+  calipso.silly("Moving file " + from + " to " + to + "...");
+
   mkdirp(path.dirname(to), 0755, function (err) {
 
     var is = fs.createReadStream(from);
@@ -848,7 +855,7 @@ function mv(from, to, next) {
 
     util.pump(is, os, function() {
       fs.unlinkSync(from);
-      next();
+      next(err);
     });
 
   });
