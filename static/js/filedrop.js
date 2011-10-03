@@ -7,7 +7,7 @@ $(function(){
 				
 		paramname:'files',		
 		maxfiles: 500,
-    	maxfilesize: 5,
+    	maxfilesize: 10,
     	data: {mediaGallery: {url: getGalleryUrl()}},    	
 		url: '/media/upload',
 		
