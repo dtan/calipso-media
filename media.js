@@ -708,8 +708,9 @@ function mediaUpload(req, res, template, block, next) {
       }
               
       gallerySortAfterUpload(gallery.url, results, function(err) {
-        res.redirect(returnTo);
-        next(err);
+        // res.redirect(returnTo);
+        res.end(JSON.stringify({status:"OK"}));
+        // next(err);
       });
 
     });

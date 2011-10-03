@@ -46,11 +46,25 @@ $(function(){
 
 });
 
+function getGalleryUrl() {
+  return "<%= gallery.url %>";
+}
+
 </script>
 
 <div class="gallery">
 	<h2 class="gallery-title"><%= gallery.name %></h2>
 	<div class="gallery-description"><%- gallery.description %></div>
+	<% if(user.isAdmin) { %>  	  
+	  <div id="dropbox">
+            <span class="message">Drop images here to upload. <br /><i>(they will only be visible to you)</i></span>
+      </div>
+      <div class="preview">		
+		<div class="progressHolder">
+			<div class="progress"></div>
+		</div>
+	</div>
+	<% } %>
 	<ul class="gallery-images <%= user.isAdmin ? "sortable" : "" %>">
 	<% 
 	media.forEach(function(item) {	
@@ -70,8 +84,7 @@ $(function(){
 	<script type="text/javascript" src="/js/jquery.inlineedit.js"></script>
 	<script type="text/javascript" src="/js/jquery.ui.touch-punch.min.js"></script>	
 	<script type="text/javascript" src="/js/jquery-ui-1.8.16.custom.min.js"></script>
+	<script type="text/javascript" src="/js/jquery.filedrop.js"></script>
+	<script type="text/javascript" src="/js/filedrop.js"></script>
 	
-	<% if(user.isAdmin) { %>  
-	  <%- form %>
-	<% } %>
 </div>
