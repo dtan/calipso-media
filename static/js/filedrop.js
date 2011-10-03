@@ -12,11 +12,10 @@ $(function(){
 		url: '/media/upload',
 		
 		uploadFinished:function(i,file,response){
-			$.data(file).addClass('done');
-			// response is the JSON object that post_file.php returns
+			$.data(file).addClass('done');			
 		},
 		afterAll:function() {
-			console.log("DONE");	
+			location.reload(true);
 		},
     	error: function(err, file) {
 			switch(err) {
