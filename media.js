@@ -705,18 +705,13 @@ function galleryRedoThumbs(req,res,template,block,next) {
   Media.find({gallery:galleryUrl}, function(err, media) {
 
     async.mapSeries(media, createThumbnail, function(err,result) {
-      
-      if(err) {
-        req.flash('info',req.t('Unable to create thumbnails because {msg}',{msg:err.message}));                  
-      } else {
-        req.flash('info',req.t('Thumbnails regenerated ...'));                  
-      }
-
-      res.redirect("/gallery/show/" + galleryUrl);
-      return next();
-       
+        if(err) calipso.error("Error processing thumbnails: " + err.message);
     });
-          
+
+    req.flash('info',req.t('Thumbnails are regenerating in the background, depending on the size of your gallery this may take some time ...'));                        
+    res.redirect("/gallery/show/" + galleryUrl);
+    return next();
+               
   });
 
 };
@@ -890,9 +885,15 @@ function createThumbnail(media, next) {
   var metadata = media.get('metadata');
   var im = require('imagemagick');
   var isPortrait = (metadata.width < metadata.height);
-  var thumbSize = isPortrait ? '100x' : 'x150';
+  
+  var thumbPortrait = '100' //calipso.config.moduleConfig('media','thumbnails:portrait') || '150x';
+  var thumbLandscape = '225' //calipso.config.moduleConfig('media','thumbnails:landscape') || 'x150';
+  var thumbSharpen = '0.2' //calipso.config.moduleConfig('media','thumbnails:sharpen') || '0.2';
+  var thumbQuality = '90' //calipso.config.moduleConfig('media','thumbnails:quality') || '80';
 
-  im.convert([path.join(rootpath,"media", media.path), '-resize', thumbSize,'-filter','lagrange','-sharpen','0.2','-quality','80', path.join(rootpath,"media", media.thumb)], function(err, stdout, stderr) {
+  var thumbSize = isPortrait ? thumbPortrait : thumbLandscape;
+
+  im.convert([path.join(rootpath,"media", media.path), '-resize', thumbSize,'-filter','lagrange','-sharpen',thumbSharpen,'-quality',thumbQuality, path.join(rootpath,"media", media.thumb)], function(err, stdout, stderr) {
     next(err,media);
   });
 
