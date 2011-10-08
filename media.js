@@ -49,10 +49,18 @@ function init(module,app,next) {
 
         // Gallery functions
         module.router.addRoute('GET /gallery',galleryList,{template:'gallery.list',block:'content.gallery.list'},this.parallel());
-        module.router.addRoute('GET /gallery/create',galleryCreateForm,{block:'content.gallery.create',admin:true},this.parallel());
+        module.router.addRoute('GET /gallery/create',galleryCreateForm,{block:'content.gallery.create',admin:true},this.parallel());        
         module.router.addRoute('POST /gallery/upsert',galleryUpsert,{admin:true},this.parallel());
+
         module.router.addRoute('GET /gallery/show/:gallery',galleryShow,{template:'gallery.show',block:'content.gallery.show'},this.parallel());              
+        module.router.addRoute('GET /gallery/show/:gallery/page/:page',galleryShow,{template:'gallery.show.page',block:'content.gallery.show'},this.parallel());              
+
+        module.router.addRoute('GET /gallery/sort/:gallery',galleryShow,{admin:true, template:'gallery.sort',block:'content.gallery.sort'},this.parallel());              
+        module.router.addRoute('GET /gallery/sort/:gallery/:by/:order',gallerySort,{admin:true},this.parallel());              
+        
+
         module.router.addRoute('GET /gallery/edit/:gallery',galleryEditForm,{block:'content.gallery.edit',admin:true},this.parallel());        
+        module.router.addRoute('GET /gallery/show/:gallery/thumbs',galleryRedoThumbs,{admin:true},this.parallel());        
         module.router.addRoute('GET /gallery/show/:gallery/image/:id',galleryMediaShow,{template:'gallery.media.show',block:'content.gallery.media.show'},this.parallel());
         module.router.addRoute('GET /gallery/delete/:gallery',galleryDelete,{},this.parallel());              
 
@@ -281,10 +289,14 @@ function galleryShow(req,res,template,block,next) {
   var Media = calipso.lib.mongoose.model('Media');
   var Gallery = calipso.lib.mongoose.model('MediaGallery');
 
-  res.menu.adminToolbar.addMenuItem({name:'List',weight:1,path:'list',url:'/gallery',description:'Return to list ...',security:[]});
-  res.menu.adminToolbar.addMenuItem({name:'Edit',weight:2,path:'edit',url:'/gallery/edit/' + galleryUrl,description:'Edit Gallery ...',security:[]});
-  res.menu.adminToolbar.addMenuItem({name:'Delete Gallery',weight:4,path:'delete',url:'/gallery/delete/' + galleryUrl,description:'Delete Gallery ...',security:[]});
-  res.menu.adminToolbar.addMenuItem({name:'Delete All',weight:3,path:'deleteall',url:'/media/delete/all?gallery=' + galleryUrl + '&returnTo=/gallery/show/' + galleryUrl, description:'Delete Image ...',security:[]});
+  res.menu.adminToolbar.addMenuItem({name:'Gallery List',weight:1,path:'list',url:'/gallery',description:'Return to list ...',security:[]});
+  res.menu.adminToolbar.addMenuItem({name:'Gallery',weight:2,path:'gallery',url:'/gallery/show/' + galleryUrl,description:'Show gallery ...',security:[]});
+  res.menu.adminToolbar.addMenuItem({name:'Edit',weight:3,path:'edit',url:'/gallery/edit/' + galleryUrl,description:'Edit Gallery ...',security:[]});
+  res.menu.adminToolbar.addMenuItem({name:'Sort',weight:4,path:'sort',url:'/gallery/sort/' + galleryUrl,description:'Sort Gallery ...',security:[]});
+  res.menu.adminToolbar.addMenuItem({name:'Redo Thumbs',weight:5,path:'thumbs',url:'/gallery/show/' + galleryUrl + '/thumbs',description:'Regenerate Thumbnails ...',security:[]});
+  res.menu.adminToolbar.addMenuItem({name:'Delete All',weight:6,path:'deleteall',url:'/media/delete/all?gallery=' + galleryUrl + '&returnTo=/gallery/show/' + galleryUrl, description:'Delete Image ...',security:[]});
+  res.menu.adminToolbar.addMenuItem({name:'Delete Gallery',weight:7,path:'delete',url:'/gallery/delete/' + galleryUrl,description:'Delete Gallery ...',security:[]});
+  
 
   // Add hidden tag to allow attachment to a gallery  
   uploadForm.fields.push({label:'',type:'hidden',name:'mediaGallery[url]'})
@@ -301,19 +313,40 @@ function galleryShow(req,res,template,block,next) {
     query.ispublic = true;
   }
 
+  // Check to see if we are paging
+  var page = req.moduleParams.page ? parseInt(req.moduleParams.page) : 1;
+  var limit = 25;
+  var from = (page - 1) * limit;
+
   // Get the gallery
   Gallery.findOne(query, function(err, gallery) {
 
     if(!err && gallery) {
 
-      // Get our content
-      Media.find({gallery:galleryUrl}).sort('sort',1).find(function(err, media) {
+    // Initialise the block based on our content
+      Media.count({gallery:galleryUrl}, function (err, count) {
 
-        calipso.form.render(uploadForm,values,req,function(form) {
-          calipso.theme.renderItem(req,res,template,block,{gallery:gallery, media:media, form:form},next);
+        var total = count;
+        var nextPage = (total > from + limit) ? page + 1 : 0;
+        if(req.url.match(/.*\/sort\/.*/)) {
+          limit = total;
+          skip = 0;
+        }
+
+        // Get our content
+        Media.find({gallery:galleryUrl})
+          .sort('sort',1)
+          .skip(from)
+          .limit(limit)
+          .find(function(err, media) {
+
+          calipso.form.render(uploadForm,values,req,function(form) {
+            calipso.theme.renderItem(req,res,template,block,{gallery:gallery, media:media, form:form, nextPage:nextPage},next);
+          });
+      
         });
-    
       });
+      
     } else {
       req.flash('error',req.t('You are not able to view media in that gallery ...'));
       res.redirect("/gallery");
@@ -463,9 +496,17 @@ function galleryUpsert(req,res,template,block,next) {
 
       if(g) {
         
-        if(req.formData.mediaGallery.url) {
-            
-          // If we have been provided with an _id we are updating
+        if(req.formData.mediaGallery.sortOrder) {            
+      
+          // Assume we are trying to sort it - THIS CANNOT work on paged results      
+          // For some reason it comes back from jquery as {'':order};
+          var orderedArray = req.formData.mediaGallery.sortOrder[''];   
+          gallerySortFromArray(orderedArray, function(err,result) {
+            res.end(err ? "ERROR" : "OK");            
+          });
+
+        } else {
+              // If we have been provided with an _id we are updating
 
           calipso.form.mapFields(req.formData.mediaGallery, g);          
 
@@ -485,14 +526,6 @@ function galleryUpsert(req,res,template,block,next) {
             }
           });
 
-        } else {
-          
-          // Assume we are trying to sort it - THIS CANNOT work on paged results      
-          // For some reason it comes back from jquery as {'':order};
-          var orderedArray = req.formData.mediaGallery.sortOrder[''];          
-          gallerySortFromArray(orderedArray, function(err,result) {
-            res.end(err ? "ERROR" : "OK");            
-          });
         }
 
       } else {
@@ -525,6 +558,35 @@ function galleryUpsert(req,res,template,block,next) {
      
    }
 
+
+}
+
+function gallerySort(req,res,template,block,next) {
+
+   var galleryUrl = req.moduleParams.gallery || '';
+   var by = req.moduleParams.by || 'name';
+   var order = req.moduleParams.order || 'asc';
+   var direction = order === 'asc' ? 1 : -1;
+
+   var Media = calipso.lib.mongoose.model('Media');      
+
+   Media.find({gallery:galleryUrl})
+    .sort(by,direction)
+    .find(function(err, media) {               
+      
+      if(err) return next(err);
+
+      var orderedArray = [];
+      media.forEach(function(item) {
+          orderedArray.push(item._id);
+      })      
+
+      gallerySortFromArray(orderedArray, function(err) {
+        res.redirect("/gallery/sort/" + galleryUrl);
+        next();
+      });
+
+  });
 
 }
 
@@ -628,6 +690,37 @@ function galleryDelete(req,res,template,block,next) {
 
 };
 
+/**
+ * List of galleries - either all or just for a user
+ */
+function galleryRedoThumbs(req,res,template,block,next) {
+
+  var async = require('async');
+  var Media = calipso.lib.mongoose.model('Media');
+  var MediaGallery = calipso.lib.mongoose.model('MediaGallery');
+
+  var galleryUrl = req.moduleParams.gallery;  
+
+  // Regenerate all the thumbnails 
+  Media.find({gallery:galleryUrl}, function(err, media) {
+
+    async.mapSeries(media, createThumbnail, function(err,result) {
+      
+      if(err) {
+        req.flash('info',req.t('Unable to create thumbnails because {msg}',{msg:err.message}));                  
+      } else {
+        req.flash('info',req.t('Thumbnails regenerated ...'));                  
+      }
+
+      res.redirect("/gallery/show/" + galleryUrl);
+      return next();
+       
+    });
+          
+  });
+
+};
+
 function doDeleteMedia(media, next) {  
   
   var Media = calipso.lib.mongoose.model('Media'), fs = require('fs');
@@ -650,6 +743,8 @@ function doDeleteMedia(media, next) {
   Media.remove({_id:media._id}, next);
 
 }
+
+
 
 /**
  * General purpose forms and functions
@@ -700,7 +795,7 @@ function mediaUpload(req, res, template, block, next) {
     }
 
     // Process everything in the queue - do it in series for now
-    async.mapSeries(fileQueue,processFile,function(err, results) {            
+    async.mapSeries(fileQueue, processFile, function(err, results) {            
       
       if(err) {
         console.dir(err);        
@@ -727,7 +822,7 @@ function processFile(file, next) {
   var Media = calipso.lib.mongoose.model('Media');  
 
   // For each file, we need to process it
-  mv(file.from, file.to,function() {    
+  mv(file.from, file.to, function() {    
 
     // Now, create the mongoose object for it
     var m = new Media();
@@ -755,24 +850,17 @@ function processFile(file, next) {
         im.readMetadata(file.to, function(err, exif_metadata) {
 
           var metadata = calipso.lib._.extend(ident_metadata, exif_metadata);
-
+        
           // Set our metadata
           m.set('metadata',metadata);          
 
           fixRotation(m, function(err, m) {
-
-            // Resize the image to create a thumb
-            // mogrify -resize 80x80 -background white -gravity center -extent 80x80 -format jpg -quality 75 -path thumbs *.jpg
-
-            var isPortrait = (metadata.width < metadata.height);
-            var thumbSize = 'x120';
-
-            im.convert([file.to, '-resize', thumbSize,'-filter','lagrange','-sharpen','0.2','-quality','80', thumb], function(err, stdout, stderr) {
-              if (err) throw err                
-              m.save(function(err) {
-                next(err, m._id);  
-              })    
-            });
+              createThumbnail(m, function(err, m) {
+                if (err) throw err                
+                m.save(function(err) {
+                  next(err, m._id);  
+                });      
+              });              
 
           });
 
@@ -791,6 +879,22 @@ function processFile(file, next) {
     });
     
   });  
+
+}
+
+/**
+ * Create a thumbnail
+ */
+function createThumbnail(media, next) {
+
+  var metadata = media.get('metadata');
+  var im = require('imagemagick');
+  var isPortrait = (metadata.width < metadata.height);
+  var thumbSize = isPortrait ? '100x' : 'x150';
+
+  im.convert([path.join(rootpath,"media", media.path), '-resize', thumbSize,'-filter','lagrange','-sharpen','0.2','-quality','80', path.join(rootpath,"media", media.thumb)], function(err, stdout, stderr) {
+    next(err,media);
+  });
 
 }
 

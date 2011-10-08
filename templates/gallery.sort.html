@@ -1,0 +1,67 @@
+<script type="text/javascript">
+
+$(function(){
+    
+	
+    // setup common ajax setting
+    $.ajaxSetup({
+        url: '/media/update',
+        type: 'POST',
+        async: false,
+        timeout: 500
+    });
+
+    // sortable
+    $( ".sortable" ).sortable({ 	    	
+	    opacity: 0.6,
+	    placeholder: 'gallery-image-highlight',
+	    appendTo: '.gallerysort-images',
+	    containment: '.gallery-sort-images',
+	    tolerance: 'pointer',
+	    delay: 100,
+	    update: function(event, ui) { 
+	    	var orderArray = $('.gallery-sort-images').sortable('toArray'); 
+      		var html = $.ajax({
+      			url: '/gallery/upsert',        		
+                data: { 'mediaGallery' : { url: '<%= gallery.url %>', sortOrder: orderArray}, type:'json' }
+            }).responseText;                     
+	    }
+	});
+
+});
+
+function getGalleryUrl() {
+  return "<%= gallery.url %>";
+}
+
+</script>
+
+<div class="gallery">
+	<h2 class="gallery-title"><%= gallery.name %></h2>	
+  <div class="gallery-sort-actions">
+    <h3>Sort Order</h3>
+    <strong>Name:</strong> <a href="<%= gallery.url %>/name/asc">Ascending</a> <a href="<%= gallery.url %>/name/desc">Descending</a> | 
+    <strong>Taken:</strong> <a href="<%= gallery.url %>/metadata.exif.dateTimeOriginal/asc">Ascending</a> <a href="<%= gallery.url %>/metadata.exif.dateTimeOriginal/desc">Descending</a> |
+    <i>Just drag around the photos to change the order ...</i>
+  </div>
+	<ul class="gallery-sort-images <%= user.isAdmin ? "sortable" : "" %>" style="float: left;">
+	<% 
+	media.forEach(function(item) {	
+		%>
+			<li class="gallery-sort-item" id="<%= item._id %>">				
+				<a href="/gallery/show/<%= gallery.url %>/image/<%= item._id %>" title="<%= item.name %>">
+					<img src="<%- item.thumb ? item.thumb : item.path %>" class="gallery-list-image" alt="<%= item.name %>" />
+				</a>																
+				<div class='<%= user.isAdmin ? "editable" : "" %>' title='<%= user.isAdmin ? "Click to edit ..." : "" %>' id='<%= item._id %>'><%= item.name %></div>				
+			</li>
+		<%		
+	});
+	%>
+	</ul>
+	<br class="clear">
+
+	<script type="text/javascript" src="/js/jquery.inlineedit.js"></script>
+	<script type="text/javascript" src="/js/jquery.ui.touch-punch.min.js"></script>	
+	<script type="text/javascript" src="/js/jquery-ui-1.8.16.custom.min.js"></script>
+	
+</div>

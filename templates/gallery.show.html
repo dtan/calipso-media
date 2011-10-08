@@ -1,48 +1,64 @@
 <script type="text/javascript">
+
 $(function(){
-    
-    // setup common ajax setting
-    $.ajaxSetup({
-        url: '/media/update',
-        type: 'POST',
-        async: false,
-        timeout: 500
-    });
 
-    // sortable
-    $( ".sortable" ).sortable({ 	    	
-	    opacity: 0.6,
-	    placeholder: 'gallery-image-highlight',
-	    appendTo: '.gallery-images',
-	    containment: '.gallery-images',
-	    tolerance: 'pointer',
-	    delay: 100,
-	    update: function(event, ui) { 
-	    	var orderArray = $('.gallery-images').sortable('toArray'); 
-      		var html = $.ajax({
-      			url: '/gallery/upsert',        		
-                data: { 'mediaGallery' : { url: '<%= gallery.url %>', sortOrder: orderArray}, type:'json' }
-            }).responseText;    
-            console.dir(html);                   
-	    }
+
+	var $container = $('.gallery-images');
+
+	$container.imagesLoaded(function(){
+	  $container.masonry({
+	    itemSelector : '.gallery-list-item',
+	    columnWidth : 20
+	  });   
+	  setEditable();
 	});
-
-    // call inlineEdit
-    $('.editable').inlineEdit({      
-       buttons: '',
-       cancelOnBlur: true,  
-        save: function(event, data) {
-
-        	var id = this.id;
-        	var name = data.value;
-
-            var html = $.ajax({
-                data: { 'media' : { _id : id, name: name}, type:'json' }
-            }).responseText;            
-            
-            return html === 'OK' ? true : false;
+    
+    $container.infinitescroll({
+      debug: true,
+      navSelector  : '.pager',    					// selector for the paged navigation 
+      nextSelector : '.pager .next', 				// selector for the NEXT link (to page 2)
+      itemSelector : '.gallery-list-item',          // selector for all items you'll retrieve
+      loading: {
+          finishedMsg: 'No more pages to load.',
+          img: 'http://i.imgur.com/6RMhx.gif'
         }
-    });
+      },
+      // trigger Masonry as a callback
+      function( newElements ) {
+        // hide new items while they are loading
+        var $newElems = $( newElements ).css({ opacity: 0 });
+        // ensure that images load before adding to masonry layout
+        $newElems.imagesLoaded(function(){
+          // show elems now they're ready
+          $newElems.animate({ opacity: 1 });
+          $container.masonry( 'appended', $newElems, true ); 
+          setEditable();
+        });
+      }
+    );
+
+    function setEditable() {
+	    // call inlineEdit
+	    $('.editable').inlineEdit({      
+	       buttons: '',
+	       cancelOnBlur: true,  
+	        save: function(event, data) {
+
+	        	var id = this.id;
+	        	var name = data.value;
+
+	            var html = $.ajax({
+	            	url: '/media/update',
+			        type: 'POST',
+			        async: false,
+			        timeout: 500,			
+	                data: { 'media' : { _id : id, name: name}, type:'json' }
+	            }).responseText;            
+	            
+	            return html === 'OK' ? true : false;
+	        }
+	    });
+	};
 
 });
 
@@ -65,26 +81,38 @@ function getGalleryUrl() {
 		</div>
 	</div>
 	<% } %>
-	<ul class="gallery-images <%= user.isAdmin ? "sortable" : "" %>">
+	<ul class="gallery-images <%= user.isAdmin ? "sortable" : "" %>" style="width: 960; ">
+	
 	<% 
-	media.forEach(function(item) {	
-		%>
-			<li id="<%= item._id %>">				
-				<a href="/gallery/show/<%= gallery.url %>/image/<%= item._id %>" title="<%= item.name %>">
-					<img src="<%- item.thumb ? item.thumb : item.path %>" class="gallery-list-image" alt="<%= item.name %>" />
-				</a>																
-				<div class='<%= user.isAdmin ? "editable" : "" %>' title='<%= user.isAdmin ? "Click to edit ..." : "" %>' id='<%= item._id %>'><%= item.name %></div>				
-			</li>
-		<%		
-	});
+		media.forEach(function(item) {	
+			%>
+				<li class="gallery-list-item" id="<%= item._id %>">				
+					<a href="/gallery/show/<%= gallery.url %>/image/<%= item._id %>" title="<%= item.name %>">
+						<img src="<%- item.thumb ? item.thumb : item.path %>" class="gallery-list-image" alt="<%= item.name %>" />
+					</a>																
+					<div class='<%= user.isAdmin ? "editable" : "" %>' title='<%= user.isAdmin ? "Click to edit ..." : "" %>' id='<%= item._id %>'><%= item.name %></div>				
+				</li>
+			<%		
+		});
 	%>
+	<% 
+	if (nextPage > 0) { %>
+		<li class="pager">
+			<a class="next" href="/gallery/show/<%= gallery.url %>/page/<%= nextPage %>">Next</a>
+		</li>
+	<% } %>
 	</ul>
+	
 	<br class="clear">
 
 	<script type="text/javascript" src="/js/jquery.inlineedit.js"></script>
 	<script type="text/javascript" src="/js/jquery.ui.touch-punch.min.js"></script>	
 	<script type="text/javascript" src="/js/jquery-ui-1.8.16.custom.min.js"></script>
 	<script type="text/javascript" src="/js/jquery.filedrop.js"></script>
-	<script type="text/javascript" src="/js/filedrop.js"></script>
+	<script type="text/javascript" src="/js/filedrop.js"></script>	
+	<script type="text/javascript" src="/js/jquery.infinitescroll.js"></script>
+	<script type="text/javascript" src="/js/jquery.imagesloaded.js"></script>
+	<script type="text/javascript" src="/js/jquery.isotope.min.js"></script>
+	<script type="text/javascript" src="/js/jquery.masonry.js"></script>
 	
 </div>

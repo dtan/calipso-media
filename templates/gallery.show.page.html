@@ -1,0 +1,17 @@
+<% 
+media.forEach(function(item) {	
+	%>
+		<li class="gallery-list-item" id="<%= item._id %>">				
+			<a href="/gallery/show/<%= gallery.url %>/image/<%= item._id %>" title="<%= item.name %>">
+				<img src="<%- item.thumb ? item.thumb : item.path %>" class="gallery-list-image" alt="<%= item.name %>" />
+			</a>																
+			<div class='<%= user.isAdmin ? "editable" : "" %>' title='<%= user.isAdmin ? "Click to edit ..." : "" %>' id='<%= item._id %>'><%= item.name %></div>				
+		</li>
+	<%		
+});
+%>
+<% if (nextPage > 0) { %>
+	<li class="pager">
+		<a class="next" href="/gallery/show/<%= gallery.url %>/page/<%= nextPage %>">Next</a>
+	</li>
+<% } %>
