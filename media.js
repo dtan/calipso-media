@@ -43,6 +43,7 @@ function init(module,app,next) {
         // General image upload
         module.router.addRoute('POST /media/upload',mediaUpload,{admin:true},this.parallel());
         module.router.addRoute('POST /media/update',mediaUpdate,{admin:true},this.parallel());
+        module.router.addRoute('POST /media/thumbnail',mediaRedoThumb,{admin:true},this.parallel());
         module.router.addRoute('GET /media/delete/:id',mediaDelete,{admin:true},this.parallel());
         module.router.addRoute('GET /media/show/:id',mediaShow,{admin:true, block:'content.media.show'},this.parallel());
         module.router.addRoute('GET /media/edit/:id',mediaEditForm,{admin:true, block:'content.media.edit'},this.parallel());
@@ -60,7 +61,6 @@ function init(module,app,next) {
         
 
         module.router.addRoute('GET /gallery/edit/:gallery',galleryEditForm,{block:'content.gallery.edit',admin:true},this.parallel());        
-        module.router.addRoute('GET /gallery/show/:gallery/thumbs',galleryRedoThumbs,{admin:true},this.parallel());        
         module.router.addRoute('GET /gallery/show/:gallery/image/:id',galleryMediaShow,{template:'gallery.media.show',block:'content.gallery.media.show'},this.parallel());
         module.router.addRoute('GET /gallery/delete/:gallery',galleryDelete,{},this.parallel());              
 
@@ -293,7 +293,6 @@ function galleryShow(req,res,template,block,next) {
   res.menu.adminToolbar.addMenuItem({name:'Gallery',weight:2,path:'gallery',url:'/gallery/show/' + galleryUrl,description:'Show gallery ...',security:[]});
   res.menu.adminToolbar.addMenuItem({name:'Edit',weight:3,path:'edit',url:'/gallery/edit/' + galleryUrl,description:'Edit Gallery ...',security:[]});
   res.menu.adminToolbar.addMenuItem({name:'Sort',weight:4,path:'sort',url:'/gallery/sort/' + galleryUrl,description:'Sort Gallery ...',security:[]});
-  res.menu.adminToolbar.addMenuItem({name:'Redo Thumbs',weight:5,path:'thumbs',url:'/gallery/show/' + galleryUrl + '/thumbs',description:'Regenerate Thumbnails ...',security:[]});
   res.menu.adminToolbar.addMenuItem({name:'Delete All',weight:6,path:'deleteall',url:'/media/delete/all?gallery=' + galleryUrl + '&returnTo=/gallery/show/' + galleryUrl, description:'Delete Image ...',security:[]});
   res.menu.adminToolbar.addMenuItem({name:'Delete Gallery',weight:7,path:'delete',url:'/gallery/delete/' + galleryUrl,description:'Delete Gallery ...',security:[]});
   
@@ -693,24 +692,20 @@ function galleryDelete(req,res,template,block,next) {
 /**
  * List of galleries - either all or just for a user
  */
-function galleryRedoThumbs(req,res,template,block,next) {
+function mediaRedoThumb(req,res,template,block,next) {
 
   var async = require('async');
-  var Media = calipso.lib.mongoose.model('Media');
-  var MediaGallery = calipso.lib.mongoose.model('MediaGallery');
-
-  var galleryUrl = req.moduleParams.gallery;  
+  var Media = calipso.lib.mongoose.model('Media');    
+  var id = req.formData.media.id;  
 
   // Regenerate all the thumbnails 
-  Media.find({gallery:galleryUrl}, function(err, media) {
+  Media.findById(id, function(err, media) {
 
-    async.mapSeries(media, createThumbnail, function(err,result) {
-        if(err) calipso.error("Error processing thumbnails: " + err.message);
+    createThumbnail(media,function(err) {
+      
+      res.end(err ? "ERROR " + err.message : "OK");
+
     });
-
-    req.flash('info',req.t('Thumbnails are regenerating in the background, depending on the size of your gallery this may take some time ...'));                        
-    res.redirect("/gallery/show/" + galleryUrl);
-    return next();
                
   });
 

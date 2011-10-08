@@ -26,7 +26,41 @@ $(function(){
                 data: { 'mediaGallery' : { url: '<%= gallery.url %>', sortOrder: orderArray}, type:'json' }
             }).responseText;                     
 	    }
-	});
+	 });
+
+
+   $('#redo-thumbnails').click(function(e) {
+        
+        e.preventDefault();
+        
+        var imgArray = $('.gallery-sort-images').sortable('toArray');
+
+        imgArray.forEach(function(value) {
+          
+          $('#' + value).css('border','solid 2px blue');
+
+          processThumb(value);
+          
+        });
+        
+   });
+
+   function processThumb(id) {
+     $.ajax({
+        thumbId: id,
+        url: '/media/thumbnail',           
+        type: 'POST',
+        async: true,
+        data: { 'media' : { 'id': id}, type:'json' },
+        success: function(response) {
+            if(response === "OK") {
+              $('#' + this.thumbId).css('border','solid 2px green');
+            } else {
+              $('#' + this.thumbId).css('border','solid 2px red');
+            }        
+        }        
+    })
+   }
 
 });
 
@@ -42,6 +76,7 @@ function getGalleryUrl() {
     <h3>Sort Order</h3>
     <strong>Name:</strong> <a href="<%= gallery.url %>/name/asc">Ascending</a> <a href="<%= gallery.url %>/name/desc">Descending</a> | 
     <strong>Taken:</strong> <a href="<%= gallery.url %>/metadata.exif.dateTimeOriginal/asc">Ascending</a> <a href="<%= gallery.url %>/metadata.exif.dateTimeOriginal/desc">Descending</a> |
+    <a id="redo-thumbnails" href="#">Re-create thumbnails ...</a> |
     <i>Just drag around the photos to change the order ...</i>
   </div>
 	<ul class="gallery-sort-images <%= user.isAdmin ? "sortable" : "" %>" style="float: left;">

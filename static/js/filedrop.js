@@ -3,9 +3,10 @@ $(function(){
 	var dropbox = $('#dropbox'),
 		message = $('.message', dropbox);
 	
-	dropbox.filedrop({
-				
-		paramname:'files',		
+	dropbox.filedrop({				
+		paramname:'files',	
+		queuefiles: 3,
+		queuewait: 50,	
 		maxfiles: 500,
     	maxfilesize: 10,
     	data: {mediaGallery: {url: getGalleryUrl()}},    	
