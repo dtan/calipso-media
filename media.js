@@ -20,8 +20,8 @@ exports = module.exports = {
 function route(req,res,module,app,next) {
 
       // Menu
-      res.menu.admin.addMenuItem({name:'Media Management',path:'cms/media',url:'/media',description:'Manage media ...',security:[]});      
-      res.menu.primary.addMenuItem({name:'Photo Galleries',path:'gallery',url:'/gallery',description:'Gallery ...',security:[]});
+      res.menu.admin.addMenuItem(req, {name:'Media Management',path:'cms/media',url:'/media',description:'Manage media ...',security:[]});      
+      res.menu.primary.addMenuItem(req, {name:'Photo Galleries',path:'gallery',url:'/gallery',description:'Gallery ...',security:[]});
 
       // Routes
       module.router.route(req,res,next);
@@ -44,6 +44,7 @@ function init(module,app,next) {
         module.router.addRoute('POST /media/upload',mediaUpload,{admin:true},this.parallel());
         module.router.addRoute('POST /media/update',mediaUpdate,{admin:true},this.parallel());
         module.router.addRoute('POST /media/thumbnail',mediaRedoThumb,{admin:true},this.parallel());
+
         module.router.addRoute('GET /media/delete/:id',mediaDelete,{admin:true},this.parallel());
         module.router.addRoute('GET /media/show/:id',mediaShow,{admin:true, block:'content.media.show'},this.parallel());
         module.router.addRoute('GET /media/edit/:id',mediaEditForm,{admin:true, block:'content.media.edit'},this.parallel());
@@ -86,7 +87,7 @@ function init(module,app,next) {
           updated: { type: Date, "default": Date.now }
         });
 
-        calipso.lib.mongoose.model('Media', Media);
+        calipso.db.model('Media', Media);
 
         // Schema
         var MediaGallery = new calipso.lib.mongoose.Schema({
@@ -100,7 +101,7 @@ function init(module,app,next) {
           updated: { type: Date, "default": Date.now }
         });
 
-        calipso.lib.mongoose.model('MediaGallery', MediaGallery);
+        calipso.db.model('MediaGallery', MediaGallery);
 
         // Add static
         app.use(calipso.lib.express["static"](__dirname + '/static'));
@@ -183,7 +184,7 @@ function mediaEditForm(req,res,template,block,next) {
  // To do 
   var mediaId = req.moduleParams.id;
   var returnTo = req.moduleParams.returnTo || "/media";
-  var Media = calipso.lib.mongoose.model('Media');  
+  var Media = calipso.db.model('Media');  
 
   var mediaForm = getMediaForm();
 
@@ -205,7 +206,7 @@ function mediaUpdate(req,res,template,block,next) {
   // Check to see if we are updating one, or the sort
   var mediaId = req.formData.media._id;
   var returnTo = req.formData.returnTo || "/media";
-  var Media = calipso.lib.mongoose.model('Media');  
+  var Media = calipso.db.model('Media');  
 
   Media.findOne({_id:mediaId}, function(err,media) {
     
@@ -234,7 +235,7 @@ function mediaDelete(req,res,template,block,next) {
 
   var mediaId = req.moduleParams.id;
   var returnTo = req.moduleParams.returnTo || "/media";
-  var Media = calipso.lib.mongoose.model('Media');
+  var Media = calipso.db.model('Media');
 
   if(mediaId === 'all') {
 
@@ -286,15 +287,15 @@ function galleryShow(req,res,template,block,next) {
   var uploadForm = getUploadForm();   
   var galleryUrl = req.moduleParams.gallery || '';
 
-  var Media = calipso.lib.mongoose.model('Media');
-  var Gallery = calipso.lib.mongoose.model('MediaGallery');
+  var Media = calipso.db.model('Media');
+  var Gallery = calipso.db.model('MediaGallery');
 
-  res.menu.adminToolbar.addMenuItem({name:'Gallery List',weight:1,path:'list',url:'/gallery',description:'Return to list ...',security:[]});
-  res.menu.adminToolbar.addMenuItem({name:'Gallery',weight:2,path:'gallery',url:'/gallery/show/' + galleryUrl,description:'Show gallery ...',security:[]});
-  res.menu.adminToolbar.addMenuItem({name:'Edit',weight:3,path:'edit',url:'/gallery/edit/' + galleryUrl,description:'Edit Gallery ...',security:[]});
-  res.menu.adminToolbar.addMenuItem({name:'Sort',weight:4,path:'sort',url:'/gallery/sort/' + galleryUrl,description:'Sort Gallery ...',security:[]});
-  res.menu.adminToolbar.addMenuItem({name:'Delete All',weight:6,path:'deleteall',url:'/media/delete/all?gallery=' + galleryUrl + '&returnTo=/gallery/show/' + galleryUrl, description:'Delete Image ...',security:[]});
-  res.menu.adminToolbar.addMenuItem({name:'Delete Gallery',weight:7,path:'delete',url:'/gallery/delete/' + galleryUrl,description:'Delete Gallery ...',security:[]});
+  res.menu.adminToolbar.addMenuItem(req, {name:'Gallery List',weight:1,path:'list',url:'/gallery',description:'Return to list ...',security:[]});
+  res.menu.adminToolbar.addMenuItem(req, {name:'Gallery',weight:2,path:'gallery',url:'/gallery/show/' + galleryUrl,description:'Show gallery ...',security:[]});
+  res.menu.adminToolbar.addMenuItem(req, {name:'Edit',weight:3,path:'edit',url:'/gallery/edit/' + galleryUrl,description:'Edit Gallery ...',security:[]});
+  res.menu.adminToolbar.addMenuItem(req, {name:'Sort',weight:4,path:'sort',url:'/gallery/sort/' + galleryUrl,description:'Sort Gallery ...',security:[]});
+  res.menu.adminToolbar.addMenuItem(req, {name:'Delete All',weight:6,path:'deleteall',url:'/media/delete/all?gallery=' + galleryUrl + '&returnTo=/gallery/show/' + galleryUrl, description:'Delete Image ...',security:[]});
+  res.menu.adminToolbar.addMenuItem(req, {name:'Delete Gallery',weight:7,path:'delete',url:'/gallery/delete/' + galleryUrl,description:'Delete Gallery ...',security:[]});
   
 
   // Add hidden tag to allow attachment to a gallery  
@@ -362,15 +363,15 @@ function galleryShow(req,res,template,block,next) {
  */
 function galleryMediaShow(req,res,template,block,next) {
 
-  var Media = calipso.lib.mongoose.model('Media');
-  var Gallery = calipso.lib.mongoose.model('MediaGallery');
+  var Media = calipso.db.model('Media');
+  var Gallery = calipso.db.model('MediaGallery');
 
   var mediaId = req.moduleParams.id;
   var galleryUrl = req.moduleParams.gallery;
 
-  res.menu.adminToolbar.addMenuItem({name:'Gallery',weight:2,path:'gallery',url:'/gallery/show/' + galleryUrl,description:'Back to Gallery ...',security:[]});
-  res.menu.adminToolbar.addMenuItem({name:'Edit',weight:2,path:'edit',url:'/media/edit/' + mediaId + '?returnTo=/gallery/show/' + galleryUrl + '/image/' + mediaId,description:'Edit Image ...',security:[]});
-  res.menu.adminToolbar.addMenuItem({name:'Delete',weight:3,path:'delete',url:'/media/delete/' + mediaId + '?returnTo=/gallery/show/' + galleryUrl, description:'Delete Image ...',security:[]});
+  res.menu.adminToolbar.addMenuItem(req, {name:'Gallery',weight:2,path:'gallery',url:'/gallery/show/' + galleryUrl,description:'Back to Gallery ...',security:[]});
+  res.menu.adminToolbar.addMenuItem(req, {name:'Edit',weight:2,path:'edit',url:'/media/edit/' + mediaId + '?returnTo=/gallery/show/' + galleryUrl + '/image/' + mediaId,description:'Edit Image ...',security:[]});
+  res.menu.adminToolbar.addMenuItem(req, {name:'Delete',weight:3,path:'delete',url:'/media/delete/' + mediaId + '?returnTo=/gallery/show/' + galleryUrl, description:'Delete Image ...',security:[]});
 
   // Check public
   var isAdmin = req.session && req.session.user && req.session.user.isAdmin;  
@@ -405,9 +406,9 @@ function galleryMediaShow(req,res,template,block,next) {
  */
 function galleryList(req,res,template,block,next) {
 
-  var Gallery = calipso.lib.mongoose.model('MediaGallery');
+  var Gallery = calipso.db.model('MediaGallery');
 
-  res.menu.adminToolbar.addMenuItem({name:'Create',weight:1,path:'create',url:'/gallery/create',description:'Create New ...',security:[]});
+  res.menu.adminToolbar.addMenuItem(req, {name:'Create',weight:1,path:'create',url:'/gallery/create',description:'Create New ...',security:[]});
 
   // Check public
   var isAdmin = req.session && req.session.user && req.session.user.isAdmin;  
@@ -450,8 +451,8 @@ function galleryEditForm(req,res,template,block,next) {
   var galleryForm = getGalleryForm();   
   var galleryUrl = req.moduleParams.gallery || '';
 
-  var Media = calipso.lib.mongoose.model('Media');
-  var Gallery = calipso.lib.mongoose.model('MediaGallery');
+  var Media = calipso.db.model('Media');
+  var Gallery = calipso.db.model('MediaGallery');
 
   // Get the gallery
   Gallery.findOne({url:galleryUrl}, function(err, gallery) {
@@ -482,7 +483,7 @@ function galleryEditForm(req,res,template,block,next) {
  */
 function galleryUpsert(req,res,template,block,next) {
   
-  var Gallery = calipso.lib.mongoose.model('MediaGallery');
+  var Gallery = calipso.db.model('MediaGallery');
 
   if(req.formData.mediaGallery) {
       
@@ -567,7 +568,7 @@ function gallerySort(req,res,template,block,next) {
    var order = req.moduleParams.order || 'asc';
    var direction = order === 'asc' ? 1 : -1;
 
-   var Media = calipso.lib.mongoose.model('Media');      
+   var Media = calipso.db.model('Media');      
 
    Media.find({gallery:galleryUrl})
     .sort(by,direction)
@@ -593,7 +594,7 @@ function gallerySortAfterUpload(galleryUrl, newMedia, next) {
   
     // Initialise the sort order of the items
     // results is the images just added, but we need to add the images we already have first
-    var Media = calipso.lib.mongoose.model('Media');      
+    var Media = calipso.db.model('Media');      
     Media.find({gallery:galleryUrl}).where('sort').gt(0).sort('sort',1).find(function(err, media) {               
 
       if(err) return next(err);
@@ -618,7 +619,7 @@ function gallerySortAfterUpload(galleryUrl, newMedia, next) {
  function gallerySortFromArray(orderedArray, next) {
    
   var async = require('async'), counter = 0;
-  var Media = calipso.lib.mongoose.model('Media');
+  var Media = calipso.db.model('Media');
 
    // Sort based on the order provided, can either be text (a property) or an array of ids
   var mediaOrder = function(mediaId, next) {
@@ -628,8 +629,13 @@ function gallerySortAfterUpload(galleryUrl, newMedia, next) {
        prevId = (currentIndex > 0 ? orderedArray[currentIndex - 1] : ''),
        nextId = (currentIndex !== orderedArray.length - 1 ? orderedArray[currentIndex + 1] : '');
    
-   // Get the media, so we can add a select
+    // Get the media, so we can add a select
     Media.findById(mediaId, function(err, media) {
+
+      if(err || !media) {
+        return next(err);
+      }
+
       counter ++;
       media.sort = counter;
       media.nextId = nextId;
@@ -651,8 +657,8 @@ function gallerySortAfterUpload(galleryUrl, newMedia, next) {
 function galleryDelete(req,res,template,block,next) {
 
   var async = require('async');
-  var Media = calipso.lib.mongoose.model('Media');
-  var MediaGallery = calipso.lib.mongoose.model('MediaGallery');
+  var Media = calipso.db.model('Media');
+  var MediaGallery = calipso.db.model('MediaGallery');
 
   var galleryUrl = req.moduleParams.gallery;
 
@@ -695,7 +701,7 @@ function galleryDelete(req,res,template,block,next) {
 function mediaRedoThumb(req,res,template,block,next) {
 
   var async = require('async');
-  var Media = calipso.lib.mongoose.model('Media');    
+  var Media = calipso.db.model('Media');    
   var id = req.formData.media.id;  
 
   // Regenerate all the thumbnails 
@@ -713,7 +719,7 @@ function mediaRedoThumb(req,res,template,block,next) {
 
 function doDeleteMedia(media, next) {  
   
-  var Media = calipso.lib.mongoose.model('Media'), fs = require('fs');
+  var Media = calipso.db.model('Media'), fs = require('fs');
 
   // Delete the file first
   try {
@@ -809,7 +815,7 @@ function processFile(file, next) {
   var im = require('imagemagick');
   
   // Create our mongoose object
-  var Media = calipso.lib.mongoose.model('Media');  
+  var Media = calipso.db.model('Media');  
 
   // For each file, we need to process it
   mv(file.from, file.to, function() {    
